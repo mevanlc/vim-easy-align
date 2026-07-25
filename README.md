@@ -733,6 +733,26 @@ during the alignment task. In order to enable this feature, set
 let g:easy_align_bypass_fold = 1
 ```
 
+### Opening interactive help in an unfocused split
+
+EasyAlign can automatically open a syntax-highlighted help buffer while its
+interactive mode is active. The buffer lists the delimiter, occurrence, mode,
+margin, filtering, and completion keys accepted by the existing interactive
+prompt. Focus remains in the target window, so the help split does not capture
+input or change how `ga`, `gA`, `:EasyAlign`, or `:LiveEasyAlign` work.
+
+The help split closes automatically when the alignment is completed or
+cancelled. It is disabled by default. Set the option to `horizontal` to open it
+below the target or `vertical` to open it to the right. Its Finish section shows
+the instructions for the current interactive mode and updates when `<CTRL-P>`
+toggles live preview.
+
+```vim
+let g:easy_align_auto_open_help_in_unfocused_split = ''
+let g:easy_align_auto_open_help_in_unfocused_split = 'horizontal'
+let g:easy_align_auto_open_help_in_unfocused_split = 'vertical'
+```
+
 ### Left/right/center mode switch in interactive mode
 
 In interactive mode, you can choose the alignment mode you want by pressing

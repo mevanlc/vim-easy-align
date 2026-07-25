@@ -3,6 +3,7 @@ Execute (Clean up test environment):
   Save g:easy_align_indentation,       g:easy_align_delimiter_align
   Save g:easy_align_interactive_modes, g:easy_align_bang_interactive_modes
   Save g:easy_align_delimiters,        g:easy_align_bypass_fold
+  Save g:easy_align_auto_open_help_in_unfocused_split
   Save &tabstop, mapleader
 
   unlet! g:easy_align_ignore_groups
@@ -12,6 +13,7 @@ Execute (Clean up test environment):
   unlet! g:easy_align_interactive_modes
   unlet! g:easy_align_bang_interactive_modes
   unlet! g:easy_align_bypass_fold
+  unlet! g:easy_align_auto_open_help_in_unfocused_split
 
   let g:easy_align_delimiters = {}
   let mapleader = ' '

@@ -1,0 +1,154 @@
+Include: include/setup.vader
+
+Execute (define help-split inspector):
+  function! EasyAlignTestInspectHelp() abort
+    let help = filter(getwininfo(),
+          \ 'getbufvar(v:val.bufnr, "easy_align_help", 0)')
+    AssertEqual 1, len(help)
+    let help = help[0]
+    let target_pos = win_screenpos(0)
+    let help_pos = win_screenpos(win_id2win(help.winid))
+    let g:easy_align_test_help = {
+          \ 'buflisted': buflisted(help.bufnr),
+          \ 'bufnr': help.bufnr,
+          \ 'buftype': getbufvar(help.bufnr, '&buftype'),
+          \ 'focused': win_getid() == help.winid,
+          \ 'lines': getbufline(help.bufnr, 1, '$'),
+          \ 'modifiable': getbufvar(help.bufnr, '&modifiable'),
+          \ 'name': bufname(help.bufnr),
+          \ 'orientation': target_pos[0] == help_pos[0]
+          \   ? 'vertical' : 'horizontal',
+          \ 'swapfile': getbufvar(help.bufnr, '&swapfile'),
+          \ 'windows': winnr('$')
+          \ }
+    call win_execute(help.winid,
+          \ 'let g:easy_align_test_help.syntax = synIDattr(synID(1, 1, 1), "name")')
+    let g:easy_align_test_help_snapshots =
+          \ get(g:, 'easy_align_test_help_snapshots', [])
+    call add(g:easy_align_test_help_snapshots, deepcopy(g:easy_align_test_help))
+    return 1
+  endfunction
+
+Given (horizontal help split):
+  a=1
+  bbb=2
+
+Execute:
+  let g:easy_align_auto_open_help_in_unfocused_split = 'horizontal'
+
+Do:
+  vip\<Enter>
+  \<C-L>\<C-R>=EasyAlignTestInspectHelp()\<CR>\<CR>
+  =
+
+Expect:
+  a   = 1
+  bbb = 2
+
+Execute:
+  AssertEqual 'horizontal', g:easy_align_test_help.orientation
+  AssertEqual 2, g:easy_align_test_help.windows
+  AssertEqual 0, g:easy_align_test_help.focused
+  AssertEqual '[EasyAlign Help] - Interactive Mode', g:easy_align_test_help.name
+  AssertEqual 'nofile', g:easy_align_test_help.buftype
+  AssertEqual 0, g:easy_align_test_help.buflisted
+  AssertEqual 0, g:easy_align_test_help.modifiable
+  AssertEqual 0, g:easy_align_test_help.swapfile
+  AssertEqual 'Occurrence  `1` first       `2`...`N` nth  `-` last       `-2` second-to-last  `*` all  `**` alternating', g:easy_align_test_help.lines[0]
+  AssertEqual 'Delimiter   ` ` whitespace  `=` operators  `:` JSON/YAML  `,` arguments        `.` chains', g:easy_align_test_help.lines[1]
+  AssertEqual '            `|` tables      `&` LaTeX      `#` comments   `"` Vim comments     `{` and `}` braces', g:easy_align_test_help.lines[2]
+  AssertEqual 'Finish      EasyAlign: enter a delimiter once to align and finish', g:easy_align_test_help.lines[13]
+  AssertEqual 'EasyAlignHelpHeading', g:easy_align_test_help.syntax
+  AssertEqual 1, winnr('$')
+  AssertEqual 0, bufexists(g:easy_align_test_help.bufnr)
+
+Given (vertical help split with live alignment):
+  a=1
+  bbb=2
+
+Execute:
+  let g:easy_align_auto_open_help_in_unfocused_split = 'vertical'
+
+Do:
+  vip\<Space>\<Enter>
+  =\<C-L>\<C-R>=EasyAlignTestInspectHelp()\<CR>\<CR>=
+
+Expect:
+  a   = 1
+  bbb = 2
+
+Execute:
+  AssertEqual 'vertical', g:easy_align_test_help.orientation
+  AssertEqual 2, g:easy_align_test_help.windows
+  AssertEqual 0, g:easy_align_test_help.focused
+  Assert index(g:easy_align_test_help.lines,
+        \ '  <C-P> or delimiter again') >= 0
+  AssertEqual 1, winnr('$')
+  AssertEqual 0, bufexists(g:easy_align_test_help.bufnr)
+
+Given (help changes when live preview is toggled):
+  a=1
+  bbb=2
+
+Execute:
+  let g:easy_align_auto_open_help_in_unfocused_split = 'horizontal'
+  let g:easy_align_test_help_snapshots = []
+
+Do:
+  vip\<Enter>
+  \<C-L>\<C-R>=EasyAlignTestInspectHelp()\<CR>\<CR>
+  \<C-P>
+  \<C-L>\<C-R>=EasyAlignTestInspectHelp()\<CR>\<CR>
+  \<C-C>
+
+Expect:
+  a=1
+  bbb=2
+
+Execute:
+  AssertEqual 2, len(g:easy_align_test_help_snapshots)
+  AssertEqual 'Finish      EasyAlign: enter a delimiter once to align and finish', g:easy_align_test_help_snapshots[0].lines[13]
+  AssertEqual 'Finish      <C-P> or delimiter again to accept the preview', g:easy_align_test_help_snapshots[1].lines[13]
+
+Given (cancel live alignment with help split):
+  a=1
+  bbb=2
+
+Execute:
+  let g:easy_align_auto_open_help_in_unfocused_split = 'horizontal'
+
+Do:
+  vip\<Space>\<Enter>
+  =\<C-L>\<C-R>=EasyAlignTestInspectHelp()\<CR>\<CR>\<C-C>
+
+Expect:
+  a=1
+  bbb=2
+
+Execute:
+  AssertEqual 1, winnr('$')
+  AssertEqual 0, bufexists(g:easy_align_test_help.bufnr)
+
+Given (explicitly disabled help split):
+  a=1
+  bbb=2
+
+Execute:
+  let g:easy_align_auto_open_help_in_unfocused_split = ''
+
+Do:
+  vip\<Enter>=
+
+Expect:
+  a   = 1
+  bbb = 2
+
+Execute:
+  AssertEqual 1, winnr('$')
+
+Execute (clean up help-split inspector):
+  delfunction EasyAlignTestInspectHelp
+  unlet! g:easy_align_test_help
+  unlet! g:easy_align_test_help_snapshots
+
+Include: include/teardown.vader

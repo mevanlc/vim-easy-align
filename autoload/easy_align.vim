@@ -48,6 +48,9 @@ let s:easy_align_delimiters_default = {
 
 let s:mode_labels = { 'l': '', 'r': '[R]', 'c': '[C]' }
 
+let s:help_split_option = 'easy_align_auto_open_help_in_unfocused_split'
+let s:help_buffer_name = '[EasyAlign Help] - Interactive Mode'
+
 let s:known_options = {
 \ 'margin_left':   [0, 1], 'margin_right':     [0, 1], 'stick_to_left':   [0],
 \ 'left_margin':   [0, 1], 'right_margin':     [0, 1], 'indentation':     [1],
@@ -641,7 +644,214 @@ function! s:shift_opts(opts, key, vals)
   endif
 endfunction
 
-function! s:interactive(range, modes, n, d, opts, rules, vis, bvis)
+function! s:help_lines(layout, live)
+  if a:layout ==# 'vertical'
+    let lines = [
+    \ 'Occurrence',
+    \ '  `1` first (default)',
+    \ '  `2`...`N` nth',
+    \ '  `-` last; `-2` second-to-last',
+    \ '  `*` all; `**` alternating',
+    \ '',
+    \ 'Delimiter',
+    \ '  ` ` whitespace',
+    \ '  `=` operators; `:` JSON/YAML',
+    \ '  `,` arguments; `.` chains',
+    \ '  `|` tables; `&` LaTeX',
+    \ '  `#` comments; `"` Vim comments',
+    \ '  `{` and `}` braces',
+    \ '',
+    \ 'Alignment',
+    \ '  <Enter> left/right/center',
+    \ '  <C-A>/<C-O> per-occurrence sequence',
+    \ '    (e.g. `lrc`, `rl*`)',
+    \ '',
+    \ 'Margins',
+    \ '  <Left>/<Right> stick/margin',
+    \ '  <Down> no margins; <Up> defaults',
+    \ '  <C-L>/<C-R> margins',
+    \ '',
+    \ 'Options',
+    \ '  <C-D> delimiter alignment',
+    \ '  <C-I> indentation',
+    \ '  <C-U> unmatched lines',
+    \ '  <C-G> ignored syntax groups',
+    \ '  <C-F> line filter',
+    \ '  <C-X> regular expression',
+    \ '',
+    \ 'Operation',
+    \ '  Cancel: <Esc> or <C-C>',
+    \ '  Toggle live preview: <C-P>',
+    \ '',
+    \ 'Finish'
+    \ ]
+    return lines + (a:live
+          \ ? ['  <C-P> or delimiter again',
+          \    '    accept the preview',
+          \    '  Finish regex: <C-X> again']
+          \ : ['  EasyAlign: enter a delimiter once',
+          \    '    align and finish immediately'])
+  endif
+
+  let lines = [
+  \ 'Occurrence  `1` first       `2`...`N` nth  `-` last       `-2` second-to-last  `*` all  `**` alternating',
+  \ 'Delimiter   ` ` whitespace  `=` operators  `:` JSON/YAML  `,` arguments        `.` chains',
+  \ '            `|` tables      `&` LaTeX      `#` comments   `"` Vim comments     `{` and `}` braces',
+  \ '',
+  \ 'Alignment   <Enter> cycle left/right/center',
+  \ '            <C-A>/<C-O> set per-occurrence sequence (e.g. `lrc`, `rl*`)',
+  \ 'Margins     <Left>/<Right> stick/margin  <Down> no margins  <Up> defaults  <C-L>/<C-R> margins',
+  \ 'Options     <C-D> delimiter alignment    <C-I> indentation  <C-U> unmatched lines',
+  \ '            <C-G> ignored syntax groups  <C-F> line filter  <C-X> regular expression',
+  \ '',
+  \ 'Operation   Cancel: <Esc> or <C-C>',
+  \ '            Toggle live preview: <C-P>',
+  \ '',
+  \ ]
+  return lines + (a:live
+        \ ? ['Finish      <C-P> or delimiter again to accept the preview',
+        \    '            Finish regex: <C-X> again']
+        \ : ['Finish      EasyAlign: enter a delimiter once to align and finish'])
+endfunction
+
+function! s:exact_bufnr(name)
+  for nr in range(1, bufnr('$'))
+    if bufexists(nr) && bufname(nr) ==# a:name
+      return nr
+    endif
+  endfor
+  return -1
+endfunction
+
+function! s:update_help_split(help)
+  if empty(a:help) || !bufexists(a:help.bufnr)
+    return
+  endif
+
+  let target_view = win_getid() == a:help.target_winid ? winsaveview() : {}
+  let old_line_count = len(getbufline(a:help.bufnr, 1, '$'))
+  let lines = s:help_lines(a:help.layout, s:live)
+  call setbufvar(a:help.bufnr, '&modifiable', 1)
+  call setbufline(a:help.bufnr, 1, lines)
+  if old_line_count > len(lines) && exists('*deletebufline')
+    call deletebufline(a:help.bufnr, len(lines) + 1, old_line_count)
+  endif
+  call setbufvar(a:help.bufnr, '&modified', 0)
+  call setbufvar(a:help.bufnr, '&modifiable', 0)
+  if a:help.layout ==# 'horizontal' && exists('*win_execute') &&
+        \ win_id2win(a:help.winid) > 0
+    call win_execute(a:help.winid,
+          \ 'resize '.min([len(lines), a:help.max_size]))
+  endif
+  if !empty(target_view) && win_getid() == a:help.target_winid
+    call winrestview(target_view)
+  endif
+  redraw
+endfunction
+
+function! s:help_split_layout()
+  let layout = get(g:, s:help_split_option, '')
+  if type(layout) != type('') || index(['', 'horizontal', 'vertical'], layout) < 0
+    call s:exit('Invalid g:'.s:help_split_option.
+          \ ': expected '''', ''horizontal'', or ''vertical''')
+  endif
+  return layout
+endfunction
+
+function! s:max_line_width(lines)
+  return max(map(copy(a:lines), 's:strwidth(v:val)'))
+endfunction
+
+function! s:configure_help_syntax()
+  syntax match EasyAlignHelpHeading /^\%(Occurrence\|Delimiter\|Alignment\|Margins\|Options\|Operation\|Finish\)\>/
+  syntax match EasyAlignHelpKey /`[^`]*`/
+  syntax match EasyAlignHelpKey /<[^>]*>/
+  highlight default link EasyAlignHelpHeading Identifier
+  highlight default link EasyAlignHelpKey Special
+  let b:current_syntax = 'easy_align_help'
+endfunction
+
+function! s:open_help_split()
+  let layout = s:help_split_layout()
+  if empty(layout)
+    return {}
+  endif
+  if !exists('*win_getid') || !exists('*win_gotoid') || !exists('*win_id2win')
+    call s:exit('g:'.s:help_split_option.' requires window-ID support')
+  endif
+
+  let target_winid = win_getid()
+  let target_view = winsaveview()
+  let lines = s:help_lines(layout, s:live)
+  if layout ==# 'horizontal'
+    let max_size = max([1, winheight(0) / 2])
+    let size = min([len(lines), max_size])
+    execute 'keepalt botright '.size.'new'
+  else
+    let max_size = 0
+    let width = winwidth(0)
+    let help_width = max([
+          \ s:max_line_width(s:help_lines(layout, 0)),
+          \ s:max_line_width(s:help_lines(layout, 1))])
+    let size = min([help_width + 2,
+          \ max([20, width / 2]), max([1, width - 2])])
+    execute 'keepalt botright '.size.'vnew'
+  endif
+
+  let help_winid = win_getid()
+  let help_bufnr = bufnr('')
+  let help_name = s:help_buffer_name
+  let suffix = 2
+  while s:exact_bufnr(help_name) >= 0
+    let help_name = printf('[EasyAlign Help %d] - Interactive Mode', suffix)
+    let suffix += 1
+  endwhile
+  execute 'silent file '.fnameescape(help_name)
+  call setline(1, lines)
+  setlocal buftype=nofile bufhidden=wipe nobuflisted noswapfile
+  setlocal nowrap nonumber norelativenumber nospell
+  setlocal foldcolumn=0 signcolumn=no
+  setlocal nomodified nomodifiable
+  if layout ==# 'horizontal'
+    setlocal winfixheight
+  else
+    setlocal winfixwidth
+  endif
+  let b:easy_align_help = 1
+  call s:configure_help_syntax()
+
+  if !win_gotoid(target_winid)
+    silent! close
+    call s:exit('EasyAlign target window disappeared')
+  endif
+  call winrestview(target_view)
+  redraw
+  return {
+  \ 'bufnr': help_bufnr,
+  \ 'layout': layout,
+  \ 'max_size': max_size,
+  \ 'target_winid': target_winid,
+  \ 'winid': help_winid
+  \ }
+endfunction
+
+function! s:close_help_split(help)
+  if empty(a:help)
+    return
+  endif
+
+  let target_winid = a:help.target_winid
+  let target_view = win_getid() == target_winid ? winsaveview() : {}
+  if win_id2win(a:help.winid) > 0 && win_gotoid(a:help.winid)
+    silent! close
+  endif
+  if win_id2win(target_winid) > 0 && win_gotoid(target_winid) && !empty(target_view)
+    call winrestview(target_view)
+  endif
+  redraw
+endfunction
+
+function! s:interactive(range, modes, n, d, opts, rules, vis, bvis, help)
   let mode = s:shift(a:modes, 1)
   let n    = a:n
   let d    = a:d
@@ -752,6 +962,7 @@ function! s:interactive(range, modes, n, d, opts, rules, vis, bvis)
       else
         let s:live = 1
       endif
+      call s:update_help_split(a:help)
     elseif c == "\<Left>"
       let opts['stl'] = 1
       let opts['lm']  = 0
@@ -838,6 +1049,16 @@ function! s:interactive(range, modes, n, d, opts, rules, vis, bvis)
     let s:live = 1
   end
   return [mode, n, ch, opts, regx]
+endfunction
+
+function! s:interactive_with_help(range, modes, n, d, opts, rules, vis, bvis)
+  let help = {}
+  try
+    let help = s:open_help_split()
+    return s:interactive(a:range, a:modes, a:n, a:d, a:opts, a:rules, a:vis, a:bvis, help)
+  finally
+    call s:close_help_split(help)
+  endtry
 endfunction
 
 function! s:valid_regexp(regexp)
@@ -1137,7 +1358,8 @@ function! s:align(bang, live, visualmode, first_line, last_line, expr)
     if bypass_fold | let &l:foldmethod = 'manual' | endif
 
     if empty(n) && empty(ch) || s:live
-      let [mode, n, ch, opts, regexp] = s:interactive(range, copy(modes), n, ch, opts, rules, vis, bvis)
+      let [mode, n, ch, opts, regexp] =
+            \ s:interactive_with_help(range, copy(modes), n, ch, opts, rules, vis, bvis)
     endif
 
     if !s:live

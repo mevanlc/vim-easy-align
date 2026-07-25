@@ -33,7 +33,8 @@ EASY-ALIGN - TABLE OF CONTENTS             *easyalign* *easy-align* *easy-align-
         Examples                                            |easy-align-6-8-1|
     Other options                                           |easy-align-7|
       Disabling &foldmethod during alignment                |easy-align-7-1|
-      Left/right/center mode switch in interactive mode     |easy-align-7-2|
+      Opening interactive help in an unfocused split        |easy-align-7-2|
+      Left/right/center mode switch in interactive mode     |easy-align-7-3|
     Advanced examples and use cases                         |easy-align-8|
     Related work                                            |easy-align-9|
     Author                                                  |easy-align-10|
@@ -840,9 +841,33 @@ to enable this feature, set `g:easy_align_bypass_fold` switch to 1.
                       {8} https://github.com/junegunn/vim-easy-align/issues/14
 
 
+< Opening interactive help in an unfocused split >____________________________~
+                       *easy-align-opening-interactive-help-in-unfocused-split*
+                                                                *easy-align-7-2*
+
+              *g:easy_align_auto_open_help_in_unfocused_split*
+
+EasyAlign can automatically open a syntax-highlighted help buffer while its
+interactive mode is active. The buffer lists the delimiter, occurrence, mode,
+margin, filtering, and completion keys accepted by the existing interactive
+prompt. Focus remains in the target window, so the help split does not capture
+input or change how `ga`, `gA`, `:EasyAlign`, or `:LiveEasyAlign` work.
+
+The help split closes automatically when the alignment is completed or
+cancelled. It is disabled by default. Set the option to `horizontal` to open it
+below the target or `vertical` to open it to the right. Its Finish section shows
+the instructions for the current interactive mode and updates when CTRL-P
+toggles live preview.
+>
+    let g:easy_align_auto_open_help_in_unfocused_split = ''
+    let g:easy_align_auto_open_help_in_unfocused_split = 'horizontal'
+    let g:easy_align_auto_open_help_in_unfocused_split = 'vertical'
+<
+
+
 < Left/right/center mode switch in interactive mode >_________________________~
                   *easy-align-left-right-center-mode-switch-in-interactive-mode*
-                                                                *easy-align-7-2*
+                                                                *easy-align-7-3*
 
 In interactive mode, you can choose the alignment mode you want by pressing
 enter keys. The non-bang command, `:EasyAlign` starts in left-alignment mode
