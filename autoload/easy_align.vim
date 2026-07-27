@@ -282,7 +282,8 @@ function! s:validate_options(opts)
   return a:opts
 endfunction
 
-function! s:split_line(line, nth, modes, cycle, fc, lc, pattern, stick_to_left, ignore_unmatched, ignore_groups)
+function! s:split_line(line, nth, modes, cycle, fc, lc, pattern,
+      \ stick_to_left, ignore_unmatched, ignore_groups, edge)
   let mode = ''
 
   let string = a:lc ?
@@ -298,6 +299,7 @@ function! s:split_line(line, nth, modes, cycle, fc, lc, pattern, stick_to_left, 
   let ignorable = 0
   let token = ''
   let phantom = 0
+  let edge_col = 0
   while 1
     let matchidx = match(string, pattern, idx)
     " No match
@@ -317,7 +319,21 @@ function! s:split_line(line, nth, modes, cycle, fc, lc, pattern, stick_to_left, 
       let delim = strpart(string, matchidx, matchend - matchidx)
     endif
 
-    let ignorable = s:highlighted_as(a:line, idx + len(part) + a:fc, a:ignore_groups)
+    let at_edge = 1
+    if a:edge
+      let edge_start = matchidx
+      let edge_end = matchend
+      if delim =~# '^\s\+$'
+        let edge_start -= len(matchstr(strpart(string, 0, matchidx), '\s*$'))
+        let edge_end += len(matchstr(strpart(string, matchend), '^\s*'))
+      endif
+      let edge_start_vcol = s:strwidth(strpart(string, 0, edge_start)) + 1
+      let edge_end_vcol = s:strwidth(strpart(string, 0, edge_end))
+      let at_edge = edge_start_vcol <= a:edge && a:edge <= edge_end_vcol
+    endif
+
+    let ignorable = !at_edge ||
+          \ s:highlighted_as(a:line, idx + len(part) + a:fc, a:ignore_groups)
     if ignorable
       let token .= match
     else
@@ -328,6 +344,11 @@ function! s:split_line(line, nth, modes, cycle, fc, lc, pattern, stick_to_left, 
     endif
 
     let idx += len(match)
+
+    if a:edge && at_edge && !ignorable
+      let edge_col = s:strwidth(strpart(string, 0, idx)) + 1
+      break
+    endif
 
     " If the string is non-empty and ends with the delimiter,
     " append an empty token to the list
@@ -370,15 +391,16 @@ function! s:split_line(line, nth, modes, cycle, fc, lc, pattern, stick_to_left, 
     call add(delims, '')
   endif
 
-  return [tokens, delims]
+  return [tokens, delims, edge_col]
 endfunction
 
-function! s:do_align(todo, modes, all_tokens, all_delims, fl, ll, fc, lc, nth, recur, dict)
+function! s:do_align(todo, modes, all_tokens, all_delims, all_edge_cols,
+      \ fl, ll, fc, lc, nth, recur, dict, edge)
   let mode       = a:modes[0]
   let lines      = {}
   let min_indent = -1
   let max = { 'pivot_len2': 0, 'token_len': 0, 'just_len': 0, 'delim_len': 0,
-        \ 'indent': 0, 'tokens': 0, 'strip_len': 0 }
+        \ 'edge_col': -1, 'indent': 0, 'tokens': 0, 'strip_len': 0 }
   let d = a:dict
   let [f, fx] = s:parse_filter(d.filter)
 
@@ -393,22 +415,28 @@ function! s:do_align(todo, modes, all_tokens, all_delims, fl, ll, fc, lc, nth, r
 
     if !has_key(a:all_tokens, line)
       " Split line into the tokens by the delimiters
-      let [tokens, delims] = s:split_line(
+      let [tokens, delims, edge_col] = s:split_line(
             \ line, a:nth, copy(a:modes), a:recur == 2,
             \ a:fc, a:lc, d.pattern,
-            \ d.stick_to_left, d.ignore_unmatched, d.ignore_groups)
+            \ d.stick_to_left, d.ignore_unmatched, d.ignore_groups, a:edge)
 
       " Remember tokens for subsequent recursive calls
       let a:all_tokens[line] = tokens
       let a:all_delims[line] = delims
+      let a:all_edge_cols[line] = edge_col
     else
       let tokens = a:all_tokens[line]
       let delims = a:all_delims[line]
+      let edge_col = a:all_edge_cols[line]
     endif
 
     " Skip empty lines
-    if empty(tokens)
+    if empty(tokens) || (a:edge && edge_col <= 0)
       continue
+    endif
+
+    if a:edge && (max.edge_col < 0 || edge_col < max.edge_col)
+      let max.edge_col = edge_col
     endif
 
     " Calculate the maximum number of tokens for a line within the range
@@ -518,6 +546,13 @@ function! s:do_align(todo, modes, all_tokens, all_delims, fl, ll, fc, lc, nth, r
     endif
   endif
 
+  let edge_pad = 0
+  if a:edge && max.edge_col > 0
+    let aligned_width = max.just_len + s:strwidth(d.ml) +
+          \ max.delim_len + s:strwidth(d.mr)
+    let edge_pad = max([0, max.edge_col - 1 - aligned_width])
+  endif
+
   " Phase 2
   for [line, elems] in items(lines)
     let tokens = a:all_tokens[line]
@@ -589,7 +624,7 @@ function! s:do_align(todo, modes, all_tokens, all_delims, fl, ll, fc, lc, nth, r
     let rest   = join(tokens[nth + 1 : -1], '')
     let nomore = empty(rest.after)
     let ml     = (empty(prefix . token) || empty(delim) && nomore) ? '' : d.ml
-    let mr     = nomore ? '' : d.mr
+    let mr     = nomore ? '' : d.mr . repeat(' ', edge_pad)
 
     " Adjust indentation of the lines starting with a delimiter
     let lpad = ''
@@ -610,10 +645,10 @@ function! s:do_align(todo, modes, all_tokens, all_delims, fl, ll, fc, lc, nth, r
     let a:todo[line] = before.join(tokens, '').after
   endfor
 
-  if a:nth < max.tokens && (a:recur || len(a:modes) > 1)
+  if !a:edge && a:nth < max.tokens && (a:recur || len(a:modes) > 1)
     call s:shift(a:modes, a:recur == 2)
-    return [a:todo, a:modes, a:all_tokens, a:all_delims,
-          \ a:fl, a:ll, a:fc, a:lc, a:nth + 1, a:recur, a:dict]
+    return [a:todo, a:modes, a:all_tokens, a:all_delims, a:all_edge_cols,
+          \ a:fl, a:ll, a:fc, a:lc, a:nth + 1, a:recur, a:dict, a:edge]
   endif
   return [a:todo]
 endfunction
@@ -648,6 +683,8 @@ function! s:help_lines(layout, live)
   if a:layout ==# 'vertical'
     let lines = [
     \ 'Occurrence',
+    \ '  `0` block-edge delimiter',
+    \ '    line-start ` `: leading indent',
     \ '  `1` first (default)',
     \ '  `2`...`N` nth',
     \ '  `-` last; `-2` second-to-last',
@@ -694,7 +731,8 @@ function! s:help_lines(layout, live)
   endif
 
   let lines = [
-  \ 'Occurrence  `1` first       `2`...`N` nth  `-` last       `-2` second-to-last  `*` all  `**` alternating',
+  \ 'Occurrence  `0` block edge; line-start ` `: leading indentation',
+  \ '            `1` first  `2`...`N` nth  `-` last  `-2` second-to-last  `*` all  `**` alternating',
   \ 'Delimiter   ` ` whitespace  `=` operators  `:` JSON/YAML  `,` arguments        `.` chains',
   \ '            `|` tables      `&` LaTeX      `#` comments   `"` Vim comments     `{` and `}` braces',
   \ '',
@@ -923,8 +961,8 @@ function! s:interactive(range, modes, n, d, opts, rules, vis, bvis, help)
       elseif n == '**' | let n = ''
       else             | let check = 1
       endif
-    elseif empty(d) && ((c == 48 && len(n) > 0) || c > 48 && c <= 57) " Numbers
-      if n[0] == '*'   | let check = 1
+    elseif empty(d) && c >= 48 && c <= 57 " Numbers
+      if n[0] == '*' || n ==# '0' | let check = 1
       else             | let n = n . ch
       end
     elseif ch == "\<C-D>"
@@ -1187,7 +1225,7 @@ function! s:parse_args(args)
   if !empty(matches)
     return [matches[1], s:test_regexp(matches[2]), opts, 1]
   else
-    let tokens = matchlist(args, '^\([1-9][0-9]*\|-[0-9]*\|\*\*\?\)\?\s*\(.\{-}\)\?$')
+    let tokens = matchlist(args, '^\(0\|[1-9][0-9]*\|-[0-9]*\|\*\*\?\)\?\s*\(.\{-}\)\?$')
     " Try swapping n and ch
     let [n, ch] = empty(tokens[2]) ? reverse(tokens[1:2]) : tokens[1:2]
 
@@ -1230,6 +1268,23 @@ function! s:update_lines(todo)
   endfor
 endfunction
 
+function! s:align_leading_whitespace(range, dict)
+  let todo = {}
+  let [f, fx] = s:parse_filter(a:dict.filter)
+  for line in range(a:range[0], a:range[1])
+    let text = getline(line)
+    if f == 1 && text !~ fx
+      continue
+    elseif f == -1 && text =~ fx
+      continue
+    endif
+    if text =~# '^\s\+\S'
+      let todo[line] = a:dict.mr . s:ltrim(text)
+    endif
+  endfor
+  return todo
+endfunction
+
 function! s:parse_nth(n)
   let n = a:n
   let recur = 0
@@ -1243,6 +1298,10 @@ function! s:parse_nth(n)
     let nth = n
   endif
   return [nth, recur]
+endfunction
+
+function! s:is_zero_nth(n)
+  return type(a:n) == type(0) ? a:n == 0 : a:n ==# '0'
 endfunction
 
 function! s:build_dict(delimiters, ch, regexp, opts)
@@ -1292,20 +1351,35 @@ function! s:build_mode_sequence(expr, recur)
 endfunction
 
 function! s:process(range, mode, n, ch, opts, regexp, rules, bvis)
-  let [nth, recur] = s:parse_nth((empty(a:n) && exists('g:easy_align_nth')) ? g:easy_align_nth : a:n)
+  let requested_nth = (empty(a:n) && exists('g:easy_align_nth'))
+        \ ? g:easy_align_nth : a:n
+  let edge_nth = s:is_zero_nth(requested_nth)
+  let edge = edge_nth && a:bvis ? min([virtcol("'<"), virtcol("'>")]) : 0
+  let leading_nth = edge_nth && !a:regexp && a:ch ==# ' ' &&
+        \ (!a:bvis || edge == 1)
+  if edge_nth && !a:bvis && !leading_nth
+    call s:exit('N-th parameter 0 outside blockwise mode requires the whitespace delimiter')
+  endif
+  let [nth, recur] = edge_nth ? [1, 0] : s:parse_nth(requested_nth)
   let dict = s:build_dict(a:rules, a:ch, a:regexp, a:opts)
   let [mode_sequence, recur] = s:build_mode_sequence(
     \ get(dict, 'align', recur == 2 ? s:alternating_modes(a:mode) : a:mode),
     \ recur)
 
+  if leading_nth
+    return { 'todo': s:align_leading_whitespace(a:range, dict),
+          \ 'summarize': [ a:opts, recur, mode_sequence ] }
+  endif
+
   let ve = &virtualedit
   set ve=all
   let args = [
     \ {}, split(mode_sequence, '\zs'),
-    \ {}, {}, a:range[0], a:range[1],
-    \ a:bvis             ? min([virtcol("'<"), virtcol("'>")]) : 1,
-    \ (!recur && a:bvis) ? max([virtcol("'<"), virtcol("'>")]) : 0,
-    \ nth, recur, dict ]
+    \ {}, {}, {}, a:range[0], a:range[1],
+    \ edge_nth ? 1 : (a:bvis ? min([virtcol("'<"), virtcol("'>")]) : 1),
+    \ edge_nth ? 0 : ((!recur && a:bvis) ? max([virtcol("'<"), virtcol("'>")]) : 0),
+    \ nth, recur, dict,
+    \ edge ]
   let &ve = ve
   while len(args) > 1
     let args = call('s:do_align', args)

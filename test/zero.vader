@@ -1,0 +1,92 @@
+Include: include/setup.vader
+
+Execute (define ga mappings):
+  nmap ga <Plug>(EasyAlign)
+  xmap ga <Plug>(EasyAlign)
+
+Given (ragged leading indentation):
+  General
+  ?                  Open or close this keymap
+      Esc                Close help/filter, reset sorting, then exit
+  q / Q              Exit outside the help dialog and filter editing
+  Ctrl-C             Exit immediately
+          Navigation
+  Arrow keys         Move the selected cell
+      Shift-wheel        Pan horizontally
+          Ctrl-S             Sort the selected cell's column
+  Ctrl-Shift-← / →   Shrink or grow the selected column
+
+Do (Align leading whitespace using an operator motion):
+  ggga}0\<Space>
+
+Expect (all entries begin in column 1):
+  General
+  ?                  Open or close this keymap
+  Esc                Close help/filter, reset sorting, then exit
+  q / Q              Exit outside the help dialog and filter editing
+  Ctrl-C             Exit immediately
+  Navigation
+  Arrow keys         Move the selected cell
+  Shift-wheel        Pan horizontally
+  Ctrl-S             Sort the selected cell's column
+  Ctrl-Shift-← / →   Shrink or grow the selected column
+
+Given (ragged leading indentation):
+  General
+  ?                  Open or close this keymap
+      Esc                Close help/filter, reset sorting, then exit
+  q / Q              Exit outside the help dialog and filter editing
+  Ctrl-C             Exit immediately
+          Navigation
+  Arrow keys         Move the selected cell
+      Shift-wheel        Pan horizontally
+          Ctrl-S             Sort the selected cell's column
+  Ctrl-Shift-← / →   Shrink or grow the selected column
+
+Do (Align leading whitespace using a linewise visual selection):
+  ggV}ga0\<Space>
+
+Expect (all entries begin in column 1):
+  General
+  ?                  Open or close this keymap
+  Esc                Close help/filter, reset sorting, then exit
+  q / Q              Exit outside the help dialog and filter editing
+  Ctrl-C             Exit immediately
+  Navigation
+  Arrow keys         Move the selected cell
+  Shift-wheel        Pan horizontally
+  Ctrl-S             Sort the selected cell's column
+  Ctrl-Shift-← / →   Shrink or grow the selected column
+
+Given (ragged leading indentation):
+  General
+  ?                  Open or close this keymap
+      Esc                Close help/filter, reset sorting, then exit
+  q / Q              Exit outside the help dialog and filter editing
+  Ctrl-C             Exit immediately
+          Navigation
+  Arrow keys         Move the selected cell
+      Shift-wheel        Pan horizontally
+          Ctrl-S             Sort the selected cell's column
+  Ctrl-Shift-← / →   Shrink or grow the selected column
+
+Do (Align leading whitespace with a block beginning in column 1):
+  gg0\<C-V>G20lga0\<Space>
+
+Expect (all entries begin in column 1):
+  General
+  ?                  Open or close this keymap
+  Esc                Close help/filter, reset sorting, then exit
+  q / Q              Exit outside the help dialog and filter editing
+  Ctrl-C             Exit immediately
+  Navigation
+  Arrow keys         Move the selected cell
+  Shift-wheel        Pan horizontally
+  Ctrl-S             Sort the selected cell's column
+  Ctrl-Shift-← / →   Shrink or grow the selected column
+
+Execute (remove ga mappings):
+  nunmap ga
+  xunmap ga
+
+Include: include/teardown.vader

@@ -19,4 +19,70 @@ Expect clojure:
               [1   999 999 999 999]
               [1   1   1   1   1]])
 
+Given (help keymap with a ragged description column):
+  01 General
+  02 ?                    Open or close this keymap
+  03 Esc                  Close help/filter, reset sorting, then exit
+  04 q / Q                Exit outside the help dialog and filter editing
+  05 Ctrl-C               Exit immediately
+  06 Navigation
+  07 Arrow keys           Move the selected cell
+  08 Mouse wheel          Pan without moving the selection
+  09 Shift-wheel          Pan horizontally
+  10 Sorting
+  11 Header click         Sort, promote, or toggle that column
+  12 Ctrl-S               Sort the selected cell's column
+  13 Ctrl-R               Reset sorting and filters
+  14 Filtering
+  15 Ctrl-F               Show or hide the filter row
+  16 Tab / Shift-Tab      Move between filter fields
+  17 Ctrl-A               Move to the beginning of the filter line
+  18 Enter                Apply the edit and release filter focus
+  19 Filter click         Focus that column's filter field
+  20 Column width
+  21 Ctrl-Shift-←/→        Shrink or grow the selected column
+  22 Mouse drag header          Resize that column
+
+Do (Align the whitespace delimiter crossing the block's left edge):
+  2G22|\<C-V>20j7l
+  \<Enter>0\<Space>
+
+Expect (help keymap with an aligned description column):
+  01 General
+  02 ?                    Open or close this keymap
+  03 Esc                  Close help/filter, reset sorting, then exit
+  04 q / Q                Exit outside the help dialog and filter editing
+  05 Ctrl-C               Exit immediately
+  06 Navigation
+  07 Arrow keys           Move the selected cell
+  08 Mouse wheel          Pan without moving the selection
+  09 Shift-wheel          Pan horizontally
+  10 Sorting
+  11 Header click         Sort, promote, or toggle that column
+  12 Ctrl-S               Sort the selected cell's column
+  13 Ctrl-R               Reset sorting and filters
+  14 Filtering
+  15 Ctrl-F               Show or hide the filter row
+  16 Tab / Shift-Tab      Move between filter fields
+  17 Ctrl-A               Move to the beginning of the filter line
+  18 Enter                Apply the edit and release filter focus
+  19 Filter click         Focus that column's filter field
+  20 Column width
+  21 Ctrl-Shift-←/→       Shrink or grow the selected column
+  22 Mouse drag header    Resize that column
+
+Given (block-edge whitespace with a wider right margin):
+  02 ?                    Open or close this keymap
+  21 Ctrl-Shift-←/→        Shrink or grow the selected column
+  22 Mouse drag header          Resize that column
+
+Do (Align the block edge and set a wider description margin):
+  gg22|\<C-V>2j7l
+  \<Enter>0\<C-R>10\<CR>\<Space>
+
+Expect (description column shifted by the right margin):
+  02 ?                           Open or close this keymap
+  21 Ctrl-Shift-←/→              Shrink or grow the selected column
+  22 Mouse drag header           Resize that column
+
 Include: include/teardown.vader

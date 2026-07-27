@@ -143,6 +143,7 @@ xmap ga <Plug>(EasyAlign)
    object to start interactive mode
 1. (Optional) Enter keys to cycle between alignment mode (left, right, or center)
 1. (Optional) N-th delimiter (default: 1)
+    - `0`         Block-edge delimiter, or leading whitespace at the start of a line
     - `1`         Around the 1st occurrences of delimiters
     - `2`         Around the 2nd occurrences of delimiters
     - ...
@@ -333,6 +334,21 @@ my_hash = { :a   => 1,
 
 However, in this case, we don't really need blockwise visual mode
 since the same can be easily done using the negative N-th parameter: `<Enter>-=`
+
+In blockwise mode, N-th delimiter `0` selects the delimiter crossing the left
+edge of the block on each line. The complete delimiter run is considered even
+when it extends outside the block, which is useful when the block is drawn over
+the whitespace gap between two text columns. For example, use `<Enter>0<Space>`
+to align those gaps. Lines without a delimiter at the block edge are unchanged,
+and margin shortcuts such as `<CTRL-R>` can move the resulting column farther
+to the right. When the block begins in column 1, `0<Space>` instead removes
+leading indentation.
+
+In a non-block range, `0` is supported with the whitespace delimiter and has the
+same leading-indentation behavior. Lines that already begin in column 1 are
+unchanged. Thus `1Gga}0<Space>` operates on the current paragraph using an
+operator motion, and `1GV}ga0<Space>` performs the same alignment with a
+linewise visual selection.
 
 
 Alignment options

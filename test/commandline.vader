@@ -188,4 +188,40 @@ Expect javascript:
     "user:    pass": "r00t: pa55"
   };
 
+Given (fields after the last delimiter):
+  a=1=22
+  aaa=333=4
+
+Execute (preserve the existing negative-zero selector):
+  %EasyAlign! -0=
+
+Expect:
+  a=1=   22
+  aaa=333=4
+
+Given (leading whitespace):
+  no indentation
+      four spaces
+  eight-column tab
+
+Execute (positive zero with a non-block whitespace range):
+  call setline(3, "\teight-column tab")
+  execute '%EasyAlign 0\ '
+
+Expect:
+  no indentation
+  four spaces
+  eight-column tab
+
+Given (positive zero with a non-whitespace delimiter):
+  a=1
+  aaa=2
+
+Execute (non-block zero remains specific to whitespace):
+  %EasyAlign 0=
+
+Expect:
+  a=1
+  aaa=2
+
 Include: include/teardown.vader
