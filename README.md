@@ -226,6 +226,7 @@ keys listed below. The meaning of each option will be described in
 | `CTRL-L`  | `left_margin`      | Input number or string                             |
 | `CTRL-R`  | `right_margin`     | Input number or string                             |
 | `CTRL-D`  | `delimiter_align`  | left, center, right                                |
+| `CTRL-E`  | `extend`           | 0, 1                                               |
 | `CTRL-U`  | `ignore_unmatched` | 0, 1                                               |
 | `CTRL-G`  | `ignore_groups`    | `[]`, `['String']`, `['Comment']`, `['String', 'Comment']` |
 | `CTRL-A`  | `align`            | Input string (`/[lrc]+\*{0,2}/`)                   |
@@ -307,6 +308,7 @@ The following table summarizes the shorthand notation.
 | `ignore_groups`    | `ig\[.*\]`     |
 | `align`            | `a[lrc*]*`     |
 | `justify`          | `jb` or `jc`   |
+| `extend`           | `e[01]`        |
 | `delimiter_align`  | `d[lrc]`       |
 | `indentation`      | `i[ksdn]`      |
 
@@ -372,6 +374,7 @@ Alignment options
 | `delimiter_align`  | string  | `r`                   | Determines how to align delimiters of different lengths |
 | `align`            | string  | `l`                   | Alignment modes for multiple occurrences of delimiters  |
 | `justify`          | string  |                       | Distribute shorter rows to the widest participating line |
+| `extend`           | boolean | 0                     | Do not align left of the rightmost existing delimiter    |
 
 There are 4 ways to set alignment options (from lowest precedence to highest):
 
@@ -392,6 +395,7 @@ There are 4 ways to set alignment options (from lowest precedence to highest):
 | `delimiter_align`  | `CTRL-D`            | `d[lrc]`       | `g:easy_align_delimiter_align`  |
 | `align`            | `CTRL-A`            | `a[lrc*]*`     |                                 |
 | `justify`          | `CTRL-J`            | `jb` or `jc`   |                                 |
+| `extend`           | `CTRL-E`            | `e[01]`        |                                 |
 
 ### Filtering lines
 
@@ -755,6 +759,34 @@ space-between justification, and equal-cell justification. For example, after
 selecting the lines, press `ga`, `CTRL-J`, `*`, `CTRL-X`, enter `]`, and press
 Enter for the space-between form. Press `CTRL-J` twice for equal cells; the
 normal Enter key or `CTRL-A` still selects left, right, or center alignment.
+
+### Extending to an existing delimiter column
+
+The `extend` option prevents alignment from pulling delimiters left. EasyAlign
+first calculates its normal target column, then extends that target to the
+rightmost original delimiter start when it is farther right. Columns are
+measured by display width, so tabs and wide characters are handled correctly.
+Only lines and delimiters participating after filtering and syntax-group checks
+affect the target.
+
+For example, select these shell options and press `ga`, `CTRL-E`, `#`:
+
+```bash
+--check-fs-case-sensitivity   # default
+--no-check-fs-case-sensitivity      # do not check filesystem case sensitivity
+```
+
+The result keeps the farther existing comment column:
+
+```bash
+--check-fs-case-sensitivity         # default
+--no-check-fs-case-sensitivity      # do not check filesystem case sensitivity
+```
+
+`CTRL-E` toggles the option in interactive mode. The equivalent command forms
+are `:EasyAlign #e1` and `:EasyAlign # { 'extend': 1 }`. For rules that normally
+use `stick_to_left`, extending places the alignment padding before the delimiter.
+The option cannot be combined with `justify`.
 
 ### Extending alignment rules
 

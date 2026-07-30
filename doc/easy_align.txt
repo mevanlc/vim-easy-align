@@ -301,6 +301,7 @@ shortcut keys listed below. The meaning of each option will be described in
  CTRL-L  |  `left_margin`       | Input number or string
  CTRL-R  |  `right_margin`      | Input number or string
  CTRL-D  |  `delimiter_align`   | left, center, right
+ CTRL-E  |  `extend`            | 0, 1
  CTRL-U  |  `ignore_unmatched`  | 0, 1
  CTRL-G  |  `ignore_groups`     | [], ["String'], ["Comment'], ["String', "Comment']
  CTRL-A  |  `align`             | Input string ( `/[lrc]+\*{0,2}/` )
@@ -390,6 +391,7 @@ The following table summarizes the shorthand notation.
   `ignore_groups`     |  `ig\[.*\]`
   `align`             |  `a[lrc*]*`
   `justify`           |  `jb`  or  `jc`
+  `extend`            |  `e[01]`
   `delimiter_align`   |  `d[lrc]`
   `indentation`       |  `i[ksdn]`
  -------------------+-----------
@@ -472,6 +474,7 @@ ALIGNMENT OPTIONS                                 *easy-align-alignment-options*
   `delimiter_align`   | string  |  `r`                    | Determines how to align delimiters of different lengths
   `align`             | string  |  `l`                    | Alignment modes for multiple occurrences of delimiters
   `justify`           | string  |                       | Distribute shorter rows to the widest participating line
+  `extend`            | boolean | 0                     | Do not align left of the rightmost existing delimiter
  -------------------+---------+-----------------------+--------------------------------------------------------
 
 There are 4 ways to set alignment options (from lowest precedence to highest):
@@ -497,6 +500,7 @@ There are 4 ways to set alignment options (from lowest precedence to highest):
   `delimiter_align`   | CTRL-D          |  `d[lrc]`     |  `g:easy_align_delimiter_align`
   `align`             | CTRL-A          |  `a[lrc*]*`   |
   `justify`           | CTRL-J          |  `jb`  or  `jc` |
+  `extend`            | CTRL-E          |  `e[01]`      |
  -------------------+-----------------+-------------+--------------------------------
 
 
@@ -847,9 +851,36 @@ for the space-between form. Press CTRL-J twice for equal cells; Enter or CTRL-A
 still selects left, right, or center alignment.
 
 
+< Extending to an existing delimiter column >_________________________________~
+                         *easy-align-extending-existing-delimiter-column*
+                                                                *easy-align-6-9*
+
+The `extend` option prevents alignment from pulling delimiters left. EasyAlign
+first calculates its normal target column, then extends that target to the
+rightmost original delimiter start when it is farther right. Columns are
+measured by display width, so tabs and wide characters are handled correctly.
+Only lines and delimiters participating after filtering and syntax-group checks
+affect the target.
+
+For example, select these shell options and press `ga`, CTRL-E, `#`:
+>
+    --check-fs-case-sensitivity   # default
+    --no-check-fs-case-sensitivity      # do not check filesystem case sensitivity
+<
+The result keeps the farther existing comment column:
+>
+    --check-fs-case-sensitivity         # default
+    --no-check-fs-case-sensitivity      # do not check filesystem case sensitivity
+<
+CTRL-E toggles the option in interactive mode. The equivalent command forms are
+`:EasyAlign #e1` and `:EasyAlign # { 'extend': 1 }`. For rules that normally use
+`stick_to_left`, extending places the alignment padding before the delimiter.
+The option cannot be combined with `justify`.
+
+
 < Extending alignment rules >_________________________________________________~
                                           *easy-align-extending-alignment-rules*
-                                                                *easy-align-6-9*
+                                                               *easy-align-6-10*
 
 Although the default rules should cover the most of the use cases, you can
 extend the rules by setting a dictionary named `g:easy_align_delimiters`.
@@ -861,7 +892,7 @@ You may refer to the definitions of the default alignment rules {here}{7}.
 
 Examples~
 
-                                                              *easy-align-6-9-1*
+                                                             *easy-align-6-10-1*
 >
     let g:easy_align_delimiters = {
     \ '>': { 'pattern': '>>\|=>\|>' },

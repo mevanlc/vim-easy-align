@@ -56,7 +56,7 @@ let s:known_options = {
 \ 'left_margin':   [0, 1], 'right_margin':     [0, 1], 'indentation':     [1],
 \ 'ignore_groups': [3   ], 'ignore_unmatched': [0   ], 'delimiter_align': [1],
 \ 'mode_sequence': [1   ], 'ignores':          [3],    'filter':          [1],
-\ 'align':         [1   ], 'justify':           [1]
+\ 'align':         [1   ], 'justify':           [1],    'extend':          [0]
 \ }
 
 let s:option_values = {
@@ -64,7 +64,8 @@ let s:option_values = {
 \ 'delimiter_align':  ['left', 'center', 'right', -1],
 \ 'ignore_unmatched': [0, 1, -1],
 \ 'ignore_groups':    [[], ['String'], ['Comment'], ['String', 'Comment'], -1],
-\ 'justify':          ['between', 'cells', -1]
+\ 'justify':          ['between', 'cells', -1],
+\ 'extend':           [1, -1]
 \ }
 
 let s:shorthand = {
@@ -72,7 +73,7 @@ let s:shorthand = {
 \ 'left_margin':   'lm', 'right_margin':     'rm', 'indentation':     'idt',
 \ 'ignore_groups': 'ig', 'ignore_unmatched': 'iu', 'delimiter_align': 'da',
 \ 'mode_sequence': 'a',  'ignores':          'ig', 'filter':          'f',
-\ 'align':         'a',  'justify':           'j'
+\ 'align':         'a',  'justify':           'j',  'extend':          'e'
 \ }
 
 if exists("*strdisplaywidth")
@@ -409,7 +410,8 @@ function! s:do_align(todo, modes, all_tokens, all_delims, all_edge_cols,
   let lines      = {}
   let min_indent = -1
   let max = { 'pivot_len2': 0, 'token_len': 0, 'just_len': 0, 'delim_len': 0,
-        \ 'edge_col': -1, 'indent': 0, 'tokens': 0, 'strip_len': 0 }
+        \ 'edge_col': -1, 'extend_len': 0, 'indent': 0, 'tokens': 0,
+        \ 'strip_len': 0 }
   let d = a:dict
   let [f, fx] = s:parse_filter(d.filter)
 
@@ -473,11 +475,13 @@ function! s:do_align(todo, modes, all_tokens, all_delims, all_edge_cols,
 
     let prefix = nth > 0 ? join(tokens[0 : nth - 1], '') : ''
     let delim  = delims[nth]
-    let token  = s:rtrim( tokens[nth] )
-    let token  = s:rtrim( strpart(token, 0, len(token) - len(s:rtrim(delim))) )
+    let token  = s:rtrim(tokens[nth])
+    let token  = strpart(token, 0, len(token) - len(s:rtrim(delim)))
     if empty(delim) && !exists('tokens[nth + 1]') && d.ignore_unmatched
       continue
     endif
+    let max.extend_len = max([max.extend_len, s:strwidth(prefix . token)])
+    let token = s:rtrim(token)
 
     let indent = s:strwidth(matchstr(tokens[0], '^\s*'))
     if min_indent < 0 || indent < min_indent
@@ -555,6 +559,12 @@ function! s:do_align(todo, modes, all_tokens, all_delims, all_edge_cols,
     endif
   endif
 
+  if d.extend
+    let max.just_len = max([
+          \ max.just_len,
+          \ max.extend_len - s:strwidth(d.ml)])
+  endif
+
   let edge_pad = 0
   if a:edge && max.edge_col > 0
     let aligned_width = max.just_len + s:strwidth(d.ml) +
@@ -578,7 +588,7 @@ function! s:do_align(todo, modes, all_tokens, all_delims, all_edge_cols,
     let rpad = ''
     if mode ==? 'l'
       let pad = repeat(' ', max.just_len - pw - tw)
-      if d.stick_to_left
+      if d.stick_to_left && !d.extend
         let rpad = pad
       else
         let token = token . pad
@@ -599,7 +609,7 @@ function! s:do_align(todo, modes, all_tokens, all_delims, all_edge_cols,
       let token = indent. repeat(' ', pf1 / 2) .s:ltrim(token). repeat(' ', p2 / 2)
       let token = substitute(token, repeat(' ', strip) . '$', '', '')
 
-      if d.stick_to_left
+      if d.stick_to_left && !d.extend
         if empty(s:rtrim(token))
           let center = len(token) / 2
           let [token, rpad] = [strpart(token, 0, center), strpart(token, center)]
@@ -722,6 +732,7 @@ function! s:help_lines(layout, live)
     \ '  <C-L>/<C-R> margins',
     \ '',
     \ 'Options',
+    \ '  <C-E> extend to rightmost delimiter',
     \ '  <C-D> delimiter alignment',
     \ '  <C-I> indentation',
     \ '  <C-U> unmatched lines',
@@ -753,7 +764,8 @@ function! s:help_lines(layout, live)
   \ '            <C-A>/<C-O> set per-occurrence sequence (e.g. `lrc`, `rl*`)',
   \ 'Layout      <C-J> columns / space-between / equal cells',
   \ 'Margins     <Left>/<Right> stick/margin  <Down> no margins  <Up> defaults  <C-L>/<C-R> margins',
-  \ 'Options     <C-D> delimiter alignment    <C-I> indentation  <C-U> unmatched lines',
+  \ 'Options     <C-E> extend to rightmost delimiter  <C-D> delimiter alignment',
+  \ '            <C-I> indentation  <C-U> unmatched lines',
   \ '            <C-G> ignored syntax groups  <C-F> line filter  <C-X> regular expression',
   \ '',
   \ 'Operation   Cancel: <Esc> or <C-C>',
@@ -966,6 +978,8 @@ function! s:interactive(range, modes, n, d, opts, rules, vis, bvis, help)
       if has_key(opts, 'a')
         let opts.a = mode . strpart(opts.a, 1)
       endif
+    elseif ch == "\<C-E>"
+      call s:shift_opts(opts, 'e', vals['extend'])
     elseif ch == '-'
       if empty(n)      | let n = '-'
       elseif n == '-'  | let n = ''
@@ -1135,7 +1149,7 @@ endfunction
 let s:shorthand_regex =
   \ '\s*\%('
   \   .'\(lm\?[0-9]\+\)\|\(rm\?[0-9]\+\)\|\(iu[01]\)\|\(\%(s\%(tl\)\?[01]\)\|[<>]\)\|'
-  \   .'\(da\?[clr]\)\|\(\%(ms\?\|a\)[lrc*]\+\)\|\(i\%(dt\)\?[kdsn]\)\|\([gv]/.*/\)\|\(\%(ig\[.*\]\|j[bc]\)\)'
+  \   .'\(da\?[clr]\)\|\(\%(ms\?\|a\)[lrc*]\+\)\|\(i\%(dt\)\?[kdsn]\)\|\([gv]/.*/\)\|\(\%(ig\[.*\]\|j[bc]\|e[01]\)\)'
   \ .'\)\+\s*$'
 
 function! s:parse_shorthand_opts(expr)
@@ -1150,7 +1164,7 @@ function! s:parse_shorthand_opts(expr)
   else
     let match = matchlist(expr, regex)
     for m in filter(match[ 1 : -1 ], '!empty(v:val)')
-      for key in ['lm', 'rm', 'l', 'r', 'stl', 's', '<', '>', 'iu', 'da', 'd', 'ms', 'm', 'ig', 'i', 'g', 'v', 'a', 'j']
+      for key in ['lm', 'rm', 'l', 'r', 'stl', 's', '<', '>', 'iu', 'da', 'd', 'ms', 'm', 'ig', 'i', 'g', 'v', 'a', 'j', 'e']
         if stridx(tolower(m), key) == 0
           let rest = strpart(m, len(key))
           if key == 'i' | let key = 'idt' | endif
@@ -1552,6 +1566,8 @@ function! s:build_dict(delimiters, ch, regexp, opts)
     \ get(dict, 'filter', '')
   let dict.justify =
     \ get(dict, 'justify', '')
+  let dict.extend =
+    \ get(dict, 'extend', 0)
   if dict.justify ==# 'b'
     let dict.justify = 'between'
   elseif dict.justify ==# 'c'
@@ -1592,6 +1608,9 @@ function! s:process(range, mode, n, ch, opts, regexp, rules, bvis)
     \ recur)
 
   if !empty(dict.justify)
+    if dict.extend
+      call s:exit('extend cannot be combined with justify')
+    endif
     if a:bvis
       call s:exit('justify does not support blockwise visual mode')
     endif

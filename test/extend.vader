@@ -1,0 +1,107 @@
+Include: include/setup.vader
+
+Given sh (shell comments with an existing alignment column):
+  --check-fs-case-sensitivity   # default
+  --no-check-fs-case-sensitivity      # do not check filesystem case sensitivity
+
+Do (extend interactively with CTRL-E):
+  vip
+  \<Enter>\<C-E>#
+
+Expect sh:
+  --check-fs-case-sensitivity         # default
+  --no-check-fs-case-sensitivity      # do not check filesystem case sensitivity
+
+Execute (interactive extend is repeatable):
+  AssertEqual ":EasyAlign # {'e': 1}", g:easy_align_last_command
+
+Given sh (shell comments with extend toggled back off):
+  --check-fs-case-sensitivity   # default
+  --no-check-fs-case-sensitivity      # do not check filesystem case sensitivity
+
+Do (CTRL-E toggles extend):
+  vip
+  \<Enter>\<C-E>\<C-E>#
+
+Expect sh:
+  --check-fs-case-sensitivity    # default
+  --no-check-fs-case-sensitivity # do not check filesystem case sensitivity
+
+Given sh (shell comments using the command option):
+  --check-fs-case-sensitivity   # default
+  --no-check-fs-case-sensitivity      # do not check filesystem case sensitivity
+
+Execute (extend option dictionary):
+  %EasyAlign # { 'extend': 1 }
+
+Expect sh:
+  --check-fs-case-sensitivity         # default
+  --no-check-fs-case-sensitivity      # do not check filesystem case sensitivity
+
+Given sh (shell comments using shorthand):
+  --check-fs-case-sensitivity   # default
+  --no-check-fs-case-sensitivity      # do not check filesystem case sensitivity
+
+Execute (extend shorthand):
+  %EasyAlign #e1
+
+Expect sh:
+  --check-fs-case-sensitivity         # default
+  --no-check-fs-case-sensitivity      # do not check filesystem case sensitivity
+
+Given sh (shell comments in live mode):
+  --check-fs-case-sensitivity   # default
+  --no-check-fs-case-sensitivity      # do not check filesystem case sensitivity
+
+Do (live interactive extend):
+  vip
+  \<Space>\<Enter>\<C-E>##
+
+Expect sh:
+  --check-fs-case-sensitivity         # default
+  --no-check-fs-case-sensitivity      # do not check filesystem case sensitivity
+
+Given (sticky colon rule):
+  a: one
+  long       : two
+  middle: three
+
+Execute (extend places alignment padding before sticky delimiters):
+  %EasyAlign :e1
+
+Expect:
+  a          : one
+  long       : two
+  middle     : three
+
+Given sh (tabs before shell comments):
+  placeholder
+  placeholder
+
+Execute (extend measures display columns):
+  set tabstop=8
+  call setline(1, "\tshort # one")
+  call setline(2, "\tx      # two")
+  %EasyAlign #e1
+  let widths = map(getline(1, 2),
+        \ 'strdisplaywidth(matchstr(v:val, ''^.\{-}\ze#''))')
+  AssertEqual [15, 15], widths
+
+Expect sh:
+  	short  # one
+  	x      # two
+
+Given (wide characters before delimiters):
+  界 = one
+  a      = two
+  wide = three
+
+Execute (extend measures wide characters by display width):
+  %EasyAlign =e1
+
+Expect:
+  界     = one
+  a      = two
+  wide   = three
+
+Include: include/teardown.vader
