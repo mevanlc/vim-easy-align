@@ -58,7 +58,8 @@ Execute:
   AssertEqual '            `1` first  `2`...`N` nth  `-` last  `-2` second-to-last  `*` all  `**` alternating', g:easy_align_test_help.lines[1]
   AssertEqual 'Delimiter   ` ` whitespace  `=` operators  `:` JSON/YAML  `,` arguments        `.` chains', g:easy_align_test_help.lines[2]
   AssertEqual '            `|` tables      `&` LaTeX      `#` comments   `"` Vim comments     `{` and `}` braces', g:easy_align_test_help.lines[3]
-  AssertEqual 'Finish      EasyAlign: enter a delimiter once to align and finish', g:easy_align_test_help.lines[14]
+  AssertEqual 'Layout      <C-J> columns / space-between / equal cells', g:easy_align_test_help.lines[7]
+  AssertEqual 'Finish      EasyAlign: enter a delimiter once to align and finish', g:easy_align_test_help.lines[15]
   AssertEqual 'EasyAlignHelpHeading', g:easy_align_test_help.syntax
   AssertEqual 1, winnr('$')
   AssertEqual 0, bufexists(g:easy_align_test_help.bufnr)
@@ -108,8 +109,8 @@ Expect:
 
 Execute:
   AssertEqual 2, len(g:easy_align_test_help_snapshots)
-  AssertEqual 'Finish      EasyAlign: enter a delimiter once to align and finish', g:easy_align_test_help_snapshots[0].lines[14]
-  AssertEqual 'Finish      <C-P> or delimiter again to accept the preview', g:easy_align_test_help_snapshots[1].lines[14]
+  AssertEqual 'Finish      EasyAlign: enter a delimiter once to align and finish', g:easy_align_test_help_snapshots[0].lines[15]
+  AssertEqual 'Finish      <C-P> or delimiter again to accept the preview', g:easy_align_test_help_snapshots[1].lines[15]
 
 Given (cancel live alignment with help split):
   a=1

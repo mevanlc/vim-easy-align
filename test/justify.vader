@@ -1,0 +1,99 @@
+Include: include/setup.vader
+
+Given:
+  [iCopy][iCut][iPaste]
+  [iSendToBack][iSendBack][iSendForward][iSendToFront]
+  [Foo][Bar]
+
+Execute (justify between cells):
+  %EasyAlign */]/ { 'justify': 'between' }
+
+Expect:
+  [iCopy]                [iCut]               [iPaste]
+  [iSendToBack][iSendBack][iSendForward][iSendToFront]
+  [Foo]                                          [Bar]
+
+Execute (justify cells with left-aligned contents):
+  %EasyAlign */]/ { 'justify': 'cells', 'align': 'l' }
+
+Expect:
+  [iCopy          ][iCut           ][iPaste          ]
+  [iSendToBack][iSendBack][iSendForward][iSendToFront]
+  [Foo                     ][Bar                     ]
+
+Execute (justify cells with centered contents):
+  %EasyAlign */]/ { 'justify': 'cells', 'align': 'c' }
+
+Expect:
+  [     iCopy     ][     iCut      ][     iPaste     ]
+  [iSendToBack][iSendBack][iSendForward][iSendToFront]
+  [          Foo           ][          Bar           ]
+
+Execute (justify shorthand):
+  %EasyAlign */]/jb
+
+Expect:
+  [iCopy]                [iCut]               [iPaste]
+  [iSendToBack][iSendBack][iSendForward][iSendToFront]
+  [Foo]                                          [Bar]
+
+Execute (justify cells and alignment shorthand):
+  %EasyAlign */]/jcal
+
+Expect:
+  [iCopy          ][iCut           ][iPaste          ]
+  [iSendToBack][iSendBack][iSendForward][iSendToFront]
+  [Foo                     ][Bar                     ]
+
+Given:
+  [iCopy][iCut][iPaste]
+  [iSendToBack][iSendBack][iSendForward][iSendToFront]
+  [Foo][Bar]
+
+Do (interactive justify between cells):
+  vip
+  \<Enter>\<C-J>*\<C-X>]\<Enter>
+
+Expect:
+  [iCopy]                [iCut]               [iPaste]
+  [iSendToBack][iSendBack][iSendForward][iSendToFront]
+  [Foo]                                          [Bar]
+
+Given:
+  [iCopy][iCut][iPaste]
+  [iSendToBack][iSendBack][iSendForward][iSendToFront]
+  [Foo][Bar]
+
+Do (live interactive justify between cells):
+  vip
+  \<Space>\<Enter>\<C-J>*\<C-X>]\<Enter>\<C-X>
+
+Expect:
+  [iCopy]                [iCut]               [iPaste]
+  [iSendToBack][iSendBack][iSendForward][iSendToFront]
+  [Foo]                                          [Bar]
+
+Given:
+  [iCopy][iCut][iPaste]
+  [iSendToBack][iSendBack][iSendForward][iSendToFront]
+  [Foo][Bar]
+
+Do (interactive justify centered cells):
+  vip
+  \<Enter>\<Enter>\<Enter>\<C-J>\<C-J>*\<C-X>]\<Enter>
+
+Expect:
+  [     iCopy     ][     iCut      ][     iPaste     ]
+  [iSendToBack][iSendBack][iSendForward][iSendToFront]
+  [          Foo           ][          Bar           ]
+
+Given:
+  [12345678901234567890][x]
+  [veryveryverylong][x][y]
+
+Execute (long cells are never truncated):
+  %EasyAlign */]/ { 'justify': 'cells' }
+
+Expect:
+  [12345678901234567890][x]
+  [veryveryverylong][x][y ]

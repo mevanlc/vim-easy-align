@@ -56,14 +56,15 @@ let s:known_options = {
 \ 'left_margin':   [0, 1], 'right_margin':     [0, 1], 'indentation':     [1],
 \ 'ignore_groups': [3   ], 'ignore_unmatched': [0   ], 'delimiter_align': [1],
 \ 'mode_sequence': [1   ], 'ignores':          [3],    'filter':          [1],
-\ 'align':         [1   ]
+\ 'align':         [1   ], 'justify':           [1]
 \ }
 
 let s:option_values = {
 \ 'indentation':      ['shallow', 'deep', 'none', 'keep', -1],
 \ 'delimiter_align':  ['left', 'center', 'right', -1],
 \ 'ignore_unmatched': [0, 1, -1],
-\ 'ignore_groups':    [[], ['String'], ['Comment'], ['String', 'Comment'], -1]
+\ 'ignore_groups':    [[], ['String'], ['Comment'], ['String', 'Comment'], -1],
+\ 'justify':          ['between', 'cells', -1]
 \ }
 
 let s:shorthand = {
@@ -71,7 +72,7 @@ let s:shorthand = {
 \ 'left_margin':   'lm', 'right_margin':     'rm', 'indentation':     'idt',
 \ 'ignore_groups': 'ig', 'ignore_unmatched': 'iu', 'delimiter_align': 'da',
 \ 'mode_sequence': 'a',  'ignores':          'ig', 'filter':          'f',
-\ 'align':         'a'
+\ 'align':         'a',  'justify':           'j'
 \ }
 
 if exists("*strdisplaywidth")
@@ -205,6 +206,14 @@ endfunction
 
 function! s:trim(str)
   return substitute(a:str, '^\s*\(.\{-}\)\s*$', '\1', '')
+endfunction
+
+function! s:sum(values)
+  let total = 0
+  for value in a:values
+    let total += value
+  endfor
+  return total
 endfunction
 
 function! s:fuzzy_lu(key)
@@ -703,6 +712,10 @@ function! s:help_lines(layout, live)
     \ '  <C-A>/<C-O> per-occurrence sequence',
     \ '    (e.g. `lrc`, `rl*`)',
     \ '',
+    \ 'Layout',
+    \ '  <C-J> columns / space-between',
+    \ '    / equal cells',
+    \ '',
     \ 'Margins',
     \ '  <Left>/<Right> stick/margin',
     \ '  <Down> no margins; <Up> defaults',
@@ -738,6 +751,7 @@ function! s:help_lines(layout, live)
   \ '',
   \ 'Alignment   <Enter> cycle left/right/center',
   \ '            <C-A>/<C-O> set per-occurrence sequence (e.g. `lrc`, `rl*`)',
+  \ 'Layout      <C-J> columns / space-between / equal cells',
   \ 'Margins     <Left>/<Right> stick/margin  <Down> no margins  <Up> defaults  <C-L>/<C-R> margins',
   \ 'Options     <C-D> delimiter alignment    <C-I> indentation  <C-U> unmatched lines',
   \ '            <C-G> ignored syntax groups  <C-F> line filter  <C-X> regular expression',
@@ -801,7 +815,7 @@ function! s:max_line_width(lines)
 endfunction
 
 function! s:configure_help_syntax()
-  syntax match EasyAlignHelpHeading /^\%(Occurrence\|Delimiter\|Alignment\|Margins\|Options\|Operation\|Finish\)\>/
+  syntax match EasyAlignHelpHeading /^\%(Occurrence\|Delimiter\|Alignment\|Layout\|Margins\|Options\|Operation\|Finish\)\>/
   syntax match EasyAlignHelpKey /`[^`]*`/
   syntax match EasyAlignHelpKey /<[^>]*>/
   highlight default link EasyAlignHelpHeading Identifier
@@ -945,6 +959,8 @@ function! s:interactive(range, modes, n, d, opts, rules, vis, bvis, help)
       elseif len(n) > 0
         let n = strpart(n, 0, len(n) - 1)
       endif
+    elseif c == 10 " CTRL-J
+      call s:shift_opts(opts, 'j', vals['justify'])
     elseif c == 13 " Enter key
       let mode = s:shift(a:modes, 1)
       if has_key(opts, 'a')
@@ -1119,7 +1135,7 @@ endfunction
 let s:shorthand_regex =
   \ '\s*\%('
   \   .'\(lm\?[0-9]\+\)\|\(rm\?[0-9]\+\)\|\(iu[01]\)\|\(\%(s\%(tl\)\?[01]\)\|[<>]\)\|'
-  \   .'\(da\?[clr]\)\|\(\%(ms\?\|a\)[lrc*]\+\)\|\(i\%(dt\)\?[kdsn]\)\|\([gv]/.*/\)\|\(ig\[.*\]\)'
+  \   .'\(da\?[clr]\)\|\(\%(ms\?\|a\)[lrc*]\+\)\|\(i\%(dt\)\?[kdsn]\)\|\([gv]/.*/\)\|\(\%(ig\[.*\]\|j[bc]\)\)'
   \ .'\)\+\s*$'
 
 function! s:parse_shorthand_opts(expr)
@@ -1134,7 +1150,7 @@ function! s:parse_shorthand_opts(expr)
   else
     let match = matchlist(expr, regex)
     for m in filter(match[ 1 : -1 ], '!empty(v:val)')
-      for key in ['lm', 'rm', 'l', 'r', 'stl', 's', '<', '>', 'iu', 'da', 'd', 'ms', 'm', 'ig', 'i', 'g', 'v', 'a']
+      for key in ['lm', 'rm', 'l', 'r', 'stl', 's', '<', '>', 'iu', 'da', 'd', 'ms', 'm', 'ig', 'i', 'g', 'v', 'a', 'j']
         if stridx(tolower(m), key) == 0
           let rest = strpart(m, len(key))
           if key == 'i' | let key = 'idt' | endif
@@ -1143,7 +1159,7 @@ function! s:parse_shorthand_opts(expr)
             let key = 'f'
           endif
 
-          if key == 'idt' || index(['d', 'f', 'm', 'a'], key[0]) >= 0
+          if key == 'idt' || index(['d', 'f', 'm', 'a', 'j'], key[0]) >= 0
             let opts[key] = rest
           elseif key == 'ig'
             try
@@ -1285,6 +1301,206 @@ function! s:align_leading_whitespace(range, dict)
   return todo
 endfunction
 
+function! s:justify_split(line, string, fc, pattern, ignore_groups)
+  let cells = []
+  let delims = []
+  let cell_start = 0
+  let scan = 0
+  while scan < len(a:string)
+    let matchidx = match(a:string, a:pattern, scan)
+    if matchidx < 0
+      break
+    endif
+    let matchend = matchend(a:string, a:pattern, scan)
+    if matchend == matchidx
+      call s:exit('justify requires non-empty delimiter matches')
+    endif
+
+    if s:highlighted_as(a:line, a:fc + matchidx, a:ignore_groups)
+      let scan = matchend
+      continue
+    endif
+
+    call add(cells, strpart(a:string, cell_start, matchend - cell_start))
+    call add(delims, strpart(a:string, matchidx, matchend - matchidx))
+    let cell_start = matchend
+    let scan = matchend
+  endwhile
+  return [cells, delims, strpart(a:string, cell_start)]
+endfunction
+
+function! s:justify_line(line, dict)
+  let string = s:rtrim(getline(a:line))
+  let [raw_cells, delims, tail] = s:justify_split(
+        \ a:line, string, 1, a:dict.pattern, a:dict.ignore_groups)
+  let tail = s:rtrim(tail)
+  let indent = ''
+  let cells = []
+
+  if !empty(raw_cells)
+    for idx in range(0, len(raw_cells) - 1)
+      let delim = delims[idx]
+      let body = strpart(raw_cells[idx], 0, len(raw_cells[idx]) - len(delim))
+      if idx == 0
+        let indent = matchstr(body, '^\s*')
+        let body = strpart(body, len(indent))
+      else
+        let body = s:ltrim(body)
+      endif
+
+      let compact = s:rtrim(body) . delim
+      let opener = get({']': '[', ')': '(', '}': '{', '>': '<'}, delim, '')
+      if !empty(opener) && stridx(body, opener) == 0
+        let body = strpart(body, len(opener))
+      else
+        let opener = ''
+      endif
+      call add(cells, {
+            \ 'compact': compact,
+            \ 'opener': opener,
+            \ 'content': s:trim(body),
+            \ 'closer': delim })
+    endfor
+  endif
+
+  return {
+        \ 'original': string,
+        \ 'width': s:strwidth(string),
+        \ 'indent': indent,
+        \ 'cells': cells,
+        \ 'tail': tail }
+endfunction
+
+function! s:justify_allocate_widths(total, minimums)
+  let widths = copy(a:minimums)
+  let slack = a:total - s:sum(widths)
+  while slack > 0
+    let smallest = min(widths)
+    let lowest = []
+    let next = -1
+    for idx in range(0, len(widths) - 1)
+      if widths[idx] == smallest
+        call add(lowest, idx)
+      elseif next < 0 || widths[idx] < next
+        let next = widths[idx]
+      endif
+    endfor
+
+    let step = next < 0 ? -1 : next - smallest
+    let needed = step * len(lowest)
+    if step > 0 && slack >= needed
+      for idx in lowest
+        let widths[idx] += step
+      endfor
+      let slack -= needed
+    else
+      let each = slack / len(lowest)
+      let extra = slack % len(lowest)
+      for pos in range(0, len(lowest) - 1)
+        let widths[lowest[pos]] += each +
+              \ (pos >= len(lowest) - extra ? 1 : 0)
+      endfor
+      let slack = 0
+    endif
+  endwhile
+  return widths
+endfunction
+
+function! s:justify_between(info, target)
+  let cell_count = len(a:info.cells)
+  let compact_width = s:strwidth(a:info.indent .
+        \ join(map(copy(a:info.cells), 'v:val.compact'), '') . a:info.tail)
+  let slack = a:target - compact_width
+  if slack < 0 || cell_count < 2
+    return a:info.original
+  endif
+
+  let gaps = cell_count - 1
+  let each = slack / gaps
+  let extra = slack % gaps
+  let output = a:info.indent
+  for idx in range(0, cell_count - 1)
+    let output .= a:info.cells[idx].compact
+    if idx < gaps
+      let output .= repeat(' ', each + (idx < extra ? 1 : 0))
+    endif
+  endfor
+  return output . a:info.tail
+endfunction
+
+function! s:justify_cells(info, target, mode_sequence, recur)
+  let cell_count = len(a:info.cells)
+  if cell_count < 1
+    return a:info.original
+  endif
+
+  let available = a:target - s:strwidth(a:info.indent . a:info.tail)
+  let minimums = map(copy(a:info.cells),
+        \ 's:strwidth(v:val.opener . v:val.content . v:val.closer)')
+  if available < s:sum(minimums)
+    return a:info.original
+  endif
+  let widths = s:justify_allocate_widths(available, minimums)
+  let modes = split(a:mode_sequence, '\zs')
+  if empty(modes)
+    let modes = ['l']
+  endif
+
+  let output = a:info.indent
+  for idx in range(0, cell_count - 1)
+    let cell = a:info.cells[idx]
+    let mode = s:shift(modes, a:recur == 2)
+    let padding = widths[idx] - minimums[idx]
+    if mode ==? 'l'
+      let [left, right] = [0, padding]
+    elseif mode ==? 'r'
+      let [left, right] = [padding, 0]
+    elseif mode ==? 'c'
+      let left = padding / 2
+      let right = padding - left
+    else
+      call s:exit('Invalid alignment mode for justify: ' . mode)
+    endif
+    let output .= cell.opener . repeat(' ', left) . cell.content .
+          \ repeat(' ', right) . cell.closer
+  endfor
+  return output . a:info.tail
+endfunction
+
+function! s:do_justify(range, dict, mode_sequence, recur)
+  let lines = {}
+  let target = 0
+  let [f, fx] = s:parse_filter(a:dict.filter)
+  let required = a:dict.justify ==# 'between' ? 2 : 1
+
+  for line in range(a:range[0], a:range[1])
+    let text = getline(line)
+    if f == 1 && text !~ fx
+      continue
+    elseif f == -1 && text =~ fx
+      continue
+    endif
+    let info = s:justify_line(line, a:dict)
+    if len(info.cells) < required
+      continue
+    endif
+    let lines[line] = info
+    let target = max([target, info.width])
+  endfor
+
+  let todo = {}
+  for [line, info] in items(lines)
+    if info.width == target
+      continue
+    elseif a:dict.justify ==# 'between'
+      let todo[line] = s:justify_between(info, target)
+    else
+      let todo[line] = s:justify_cells(info, target, a:mode_sequence, a:recur)
+    endif
+  endfor
+  return todo
+endfunction
+
 function! s:parse_nth(n)
   let n = a:n
   let recur = 0
@@ -1334,6 +1550,15 @@ function! s:build_dict(delimiters, ch, regexp, opts)
     \ get(dict, 'ignore_groups', get(dict, 'ignores', s:ignored_syntax()))
   let dict.filter =
     \ get(dict, 'filter', '')
+  let dict.justify =
+    \ get(dict, 'justify', '')
+  if dict.justify ==# 'b'
+    let dict.justify = 'between'
+  elseif dict.justify ==# 'c'
+    let dict.justify = 'cells'
+  elseif !empty(dict.justify) && index(['between', 'cells'], dict.justify) < 0
+    call s:exit('Invalid justify: ' . dict.justify)
+  endif
   return dict
 endfunction
 
@@ -1365,6 +1590,14 @@ function! s:process(range, mode, n, ch, opts, regexp, rules, bvis)
   let [mode_sequence, recur] = s:build_mode_sequence(
     \ get(dict, 'align', recur == 2 ? s:alternating_modes(a:mode) : a:mode),
     \ recur)
+
+  if !empty(dict.justify)
+    if a:bvis
+      call s:exit('justify does not support blockwise visual mode')
+    endif
+    return { 'todo': s:do_justify(a:range, dict, mode_sequence, recur),
+          \ 'summarize': [ a:opts, recur, mode_sequence ] }
+  endif
 
   if leading_nth
     return { 'todo': s:align_leading_whitespace(a:range, dict),

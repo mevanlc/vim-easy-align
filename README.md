@@ -229,6 +229,7 @@ keys listed below. The meaning of each option will be described in
 | `CTRL-U`  | `ignore_unmatched` | 0, 1                                               |
 | `CTRL-G`  | `ignore_groups`    | `[]`, `['String']`, `['Comment']`, `['String', 'Comment']` |
 | `CTRL-A`  | `align`            | Input string (`/[lrc]+\*{0,2}/`)                   |
+| `CTRL-J`  | `justify`          | off, between, cells                                |
 | `<Left>`  | `stick_to_left`    | `{ 'stick_to_left': 1, 'left_margin': 0 }`         |
 | `<Right>` | `stick_to_left`    | `{ 'stick_to_left': 0, 'left_margin': 1 }`         |
 | `<Down>`  | `*_margin`         | `{ 'left_margin': 0, 'right_margin': 0 }`          |
@@ -305,6 +306,7 @@ The following table summarizes the shorthand notation.
 | `ignore_unmatched` | `iu[01]`       |
 | `ignore_groups`    | `ig\[.*\]`     |
 | `align`            | `a[lrc*]*`     |
+| `justify`          | `jb` or `jc`   |
 | `delimiter_align`  | `d[lrc]`       |
 | `indentation`      | `i[ksdn]`      |
 
@@ -369,6 +371,7 @@ Alignment options
 | `indentation`      | string  | `k`                   | Indentation method (*k*eep, *d*eep, *s*hallow, *n*one)  |
 | `delimiter_align`  | string  | `r`                   | Determines how to align delimiters of different lengths |
 | `align`            | string  | `l`                   | Alignment modes for multiple occurrences of delimiters  |
+| `justify`          | string  |                       | Distribute shorter rows to the widest participating line |
 
 There are 4 ways to set alignment options (from lowest precedence to highest):
 
@@ -388,6 +391,7 @@ There are 4 ways to set alignment options (from lowest precedence to highest):
 | `indentation`      | `CTRL-I`            | `i[ksdn]`      | `g:easy_align_indentation`      |
 | `delimiter_align`  | `CTRL-D`            | `d[lrc]`       | `g:easy_align_delimiter_align`  |
 | `align`            | `CTRL-A`            | `a[lrc*]*`     |                                 |
+| `justify`          | `CTRL-J`            | `jb` or `jc`   |                                 |
 
 ### Filtering lines
 
@@ -695,6 +699,62 @@ interactive mode with the special key `CTRL-A`)
 " over the 3rd to the last occurrences of delimiters
 :EasyAlign 3=arlc**
 ```
+
+### Justifying rows to the widest line
+
+The `justify` option uses every matched delimiter to divide a line into cells,
+then expands shorter participating lines to the display width of the widest one.
+The widest line is left unchanged. This layout is linewise; blockwise visual
+selections are not supported.
+
+`between` preserves the cells and distributes the available columns over the
+gaps between them:
+
+```vim
+:'<,'>EasyAlign * /]/ { 'justify': 'between' }
+" Shorthand: :'<,'>EasyAlign */]/jb
+```
+
+```text
+[iCopy]                [iCut]               [iPaste]
+[iSendToBack][iSendBack][iSendForward][iSendToFront]
+[Foo]                                          [Bar]
+```
+
+`cells` instead assigns balanced widths to the cells. The existing `align`
+option controls the placement of each cell's contents. Cells that need more
+than an equal share keep their minimum width, and the remaining width is
+balanced over the other cells.
+
+```vim
+:'<,'>EasyAlign * /]/ { 'justify': 'cells', 'align': 'l' }
+" Shorthand for left alignment: :'<,'>EasyAlign */]/jcal
+```
+
+```text
+[iCopy          ][iCut           ][iPaste          ]
+[iSendToBack][iSendBack][iSendForward][iSendToFront]
+[Foo                     ][Bar                     ]
+```
+
+Use `'align': 'c'` to center the contents:
+
+```text
+[     iCopy     ][     iCut      ][     iPaste     ]
+[iSendToBack][iSendBack][iSendForward][iSendToFront]
+[          Foo           ][          Bar           ]
+```
+
+When a matched delimiter is one of `]`, `)`, `}`, or `>`, a matching opener at
+the start of the cell is kept at the cell edge, so padding is inserted inside
+the pair. Otherwise padding is placed around the cell contents before the
+delimiter.
+
+In interactive mode, `CTRL-J` cycles through normal column alignment,
+space-between justification, and equal-cell justification. For example, after
+selecting the lines, press `ga`, `CTRL-J`, `*`, `CTRL-X`, enter `]`, and press
+Enter for the space-between form. Press `CTRL-J` twice for equal cells; the
+normal Enter key or `CTRL-A` still selects left, right, or center alignment.
 
 ### Extending alignment rules
 
